@@ -4,14 +4,9 @@
     "description": "Trắc nghiệm ôn tập giữa kì QPAN",
     "file": "quizzes/ktgkqpan.html",
     "icon": "fa-shield-halved"
-  },
-  {
-    "title": "test snake",
-    "description": "chỉ là test thao tác",
-    "file": "quizzes/Snake.html",
-    "icon": "fa-landmark"
   }
 ]
+
 
 
 
