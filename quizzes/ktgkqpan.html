@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểm Tra Giữa Kỳ - GDQPAN Khối 12</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #c41e3a;
+            --secondary-color: #00573f;
+            --accent-color: #fcd116;
+            --text-color: #333;
+            --light-bg: #f5f5f5;
+            --white: #ffffff;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: var(--white);
+            padding: 20px 0;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .quiz-container {
+            background-color: var(--white);
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .question-container {
+            margin-bottom: 30px;
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .question-container.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .question-number {
+            background-color: var(--primary-color);
+            color: var(--white);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .options-container {
+            display: grid;
+            gap: 15px;
+        }
+
+        .option {
+            background-color: var(--light-bg);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+        }
+
+        .option:hover {
+            background-color: #e0e0e0;
+            transform: translateX(5px);
+        }
+
+        .option.selected {
+            background-color: rgba(196, 30, 58, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .option.correct {
+            background-color: rgba(0, 87, 63, 0.1);
+            border-color: var(--secondary-color);
+        }
+
+        .option.incorrect {
+            background-color: rgba(196, 30, 58, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .option-letter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px;
+            height: 30px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border-radius: 50%;
+            margin-right: 15px;
+            font-weight: 500;
+        }
+
+        .quiz-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background-color: #a01830;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: var(--white);
+        }
+
+        .btn-secondary:hover {
+            background-color: #004532;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .timer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--white);
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: var(--primary-color);
+            font-size: 2rem;
+        }
+
+        .modal-body {
+            margin-bottom: 30px;
+        }
+
+        .score {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin: 20px 0;
+        }
+
+        .score-message {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .flag-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 40px;
+            box-shadow: var(--shadow);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .flag {
+            width: 100%;
+            height: 100%;
+            background-color: #c41e3a;
+            position: relative;
+        }
+
+        .flag::before {
+            content: "★";
+            position: absolute;
+            top: 50%;
+            left: 20%;
+            transform: translate(-50%, -50%);
+            color: #fcd116;
+            font-size: 20px;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .question-text {
+                font-size: 1rem;
+            }
+            
+            .quiz-controls {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="webgl-canvas"></canvas>
+    
+    <div class="container">
+        <header>
+            <div class="flag-container">
+                <div class="flag"></div>
+            </div>
+            <h1>KIỂM TRA GIỮA KỲ</h1>
+            <p>Môn: Giáo dục Quốc phòng - An ninh nhân dân Khối 12</p>
+        </header>
+
+        <main class="quiz-container">
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+
+            <div id="quiz-content">
+                <!-- Questions will be inserted here -->
+            </div>
+
+            <div class="quiz-controls">
+                <button class="btn btn-secondary" id="prev-btn" disabled>
+                    <i class="fas fa-arrow-left"></i> Câu trước
+                </button>
+                
+                <div class="timer">
+                    <i class="fas fa-clock"></i>
+                    <span id="timer">00:00</span>
+                </div>
+                
+                <button class="btn btn-primary" id="next-btn">
+                    Câu tiếp theo <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="result-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Kết quả bài kiểm tra</h2>
+            </div>
+            <div class="modal-body">
+                <div class="score" id="score">0/35</div>
+                <p class="score-message" id="score-message"></p>
+                <p id="correct-answers"></p>
+                <p id="time-spent"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="review-btn">
+                    <i class="fas fa-eye"></i> Xem lại đáp án
+                </button>
+                <button class="btn btn-primary" id="restart-btn">
+                    <i class="fas fa-redo"></i> Làm lại
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebGL2 Background Effect
+        function initWebGL() {
+            const canvas = document.getElementById('webgl-canvas');
+            const gl = canvas.getContext('webgl2');
+            
+            if (!gl) {
+                console.log('WebGL2 not supported, falling back to canvas');
+                return;
+            }
+            
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
+            
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            const vertexShaderSource = `#version 300 es
+                in vec2 a_position;
+                out vec2 v_texCoord;
+                
+                void main() {
+                    gl_Position = vec4(a_position, 0.0, 1.0);
+                    v_texCoord = a_position * 0.5 + 0.5;
+                }
+            `;
+            
+            const fragmentShaderSource = `#version 300 es
+                precision highp float;
+                
+                in vec2 v_texCoord;
+                out vec4 outColor;
+                
+                uniform float u_time;
+                uniform vec2 u_resolution;
+                
+                void main() {
+                    vec2 st = gl_FragCoord.xy / u_resolution;
+                    
+                    float r = 0.0;
+                    float g = 0.0;
+                    float b = 0.0;
+                    
+                    // Create a simple animated pattern
+                    float pattern = sin(st.x * 10.0 + u_time) * cos(st.y * 10.0 + u_time);
+                    
+                    // Use colors from the Vietnamese flag
+                    r = 0.77 + pattern * 0.1;
+                    g = 0.12 + pattern * 0.05;
+                    b = 0.23 + pattern * 0.05;
+                    
+                    outColor = vec4(r, g, b, 0.1);
+                }
+            `;
+            
+            function createShader(gl, type, source) {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    console.error('Error compiling shader:', gl.getShaderInfoLog(shader));
+                    gl.deleteShader(shader);
+                    return null;
+                }
+                
+                return shader;
+            }
+            
+            const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+            const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+            
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Error linking program:', gl.getProgramInfoLog(program));
+                return;
+            }
+            
+            const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
+            const timeUniformLocation = gl.getUniformLocation(program, 'u_time');
+            const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
+            
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            
+            const positions = [
+                -1, -1,
+                1, -1,
+                -1, 1,
+                1, 1,
+            ];
+            
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+            
+            let startTime = Date.now();
+            
+            function render() {
+                const currentTime = (Date.now() - startTime) / 1000;
+                
+                gl.clearColor(0, 0, 0, 0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                
+                gl.useProgram(program);
+                
+                gl.enableVertexAttribArray(positionAttributeLocation);
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+                
+                gl.uniform1f(timeUniformLocation, currentTime);
+                gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
+                
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                
+                requestAnimationFrame(render);
+            }
+            
+            render();
+        }
+        
+        // Quiz Data
+        const quizData = [
+            {
+                question: "Thắng lợi trong cuộc kháng chiến chống Mỹ cứu nước của nhân dân Cam-pu-chia diễn ra trong thời gian nào?",
+                options: ["17/4/1975", "1/1/1975", "30/4/1975", "2/9/1945"],
+                correct: 0
+            },
+            {
+                question: "Tập đoàn Pol Pot – Ieng Sary (PônPốt–IêngXary) lên cầm quyền vào thời gian nào?",
+                options: ["4/1975", "1/1975", "6/1975", "12/1975"],
+                correct: 0
+            },
+            {
+                question: "Tập đoàn Pôn Pốt–IêngXary phát động chiến tranh xâm lược Việt Nam thời gian nào?",
+                options: ["30-4-1977", "1-1-1977", "17-2-1979", "23-12-1978"],
+                correct: 0
+            },
+            {
+                question: "Bộ Chính trị và Quân uỷ Trung ương quyết định phát động chiến tranh nhân dân thời gian nào?",
+                options: ["15-6-1978", "30-4-1977", "17-2-1979", "23-12-1978"],
+                correct: 0
+            },
+            {
+                question: "Mặt trận Đoàn kết dân tộc cứu nước Cam-pu-chia được thành lập?",
+                options: ["2/12/1978", "15/6/1978", "7/1/1979", "23/12/1978"],
+                correct: 0
+            },
+            {
+                question: "Tập đoàn Pôn Pốt – Iêng Xary mở cuộc tiến công trên toàn tuyến biên giới Tây Nam nước ta thời gian nào?",
+                options: ["23/12/1978", "2/12/1978", "7/1/1979", "15/6/1978"],
+                correct: 0
+            },
+            {
+                question: "Thủ đô Phnom Penh (Phnôm Pênh) hoàn toàn được giải phóng thời gian nào?",
+                options: ["7/1/1979", "23/12/1978", "2/12/1978", "15/6/1978"],
+                correct: 0
+            },
+            {
+                question: "Chính quyền Trung Quốc tăng cường các hoạt động quân sự, khiêu khích vũ trang, xâm lấn đất đai vùng biên giới phía Bắc Việt Nam năm nào?",
+                options: ["1975-1978", "1979-1980", "1980-1985", "1970-1975"],
+                correct: 0
+            },
+            {
+                question: "Chính quyền Trung Quốc phát động chiến tranh xâm lược quy mô lớn sang lãnh thổ Việt Nam thời gian nào?",
+                options: ["17/2/1979", "23/12/1978", "7/1/1979", "5/3/1979"],
+                correct: 0
+            },
+            {
+                question: "Chủ tịch nước Cộng hoà xã hội chủ nghĩa Việt Nam công bố Lệnh Tổng động viên trong cả nước để bảo vệ Tổ quốc?",
+                options: ["5/3/1979", "17/2/1979", "18/3/1979", "7/1/1979"],
+                correct: 0
+            },
+            {
+                question: "Ngày,tháng, năm chính quyền Trung Quốc tuyên bố rút quân khỏi lãnh thổ Việt Nam?",
+                options: ["5/3/1979", "17/2/1979", "18/3/1979", "7/1/1979"],
+                correct: 0
+            },
+            {
+                question: "Trung Quốc đã rút quân khỏi nước ta vào thời gian nào?",
+                options: ["18/3/1979", "5/3/1979", "17/2/1979", "7/1/1979"],
+                correct: 0
+            },
+            {
+                question: "Chính quyền Trung Quốc chiếm đóng trái phép nhóm đảo phía Đông quần đảo Hoàng Sa năm nào?",
+                options: ["1956", "1974", "1988", "1979"],
+                correct: 0
+            },
+            {
+                question: "Chính quyền Trung Quốc chiếm đóng trái phép nhóm đảo phía Tây quần đảo Hoàng Sa năm nào?",
+                options: ["1974", "1956", "1988", "1979"],
+                correct: 0
+            },
+            {
+                question: "Quân và dân ta đã chiến đấu ngoan cường, dũng cảm hi sinh, đặc biệt tại trận chiến đấu ở Đá Gạc Ma năm nào?",
+                options: ["3/1988", "1974", "1956", "1979"],
+                correct: 0
+            },
+            {
+                question: "Chức năng của bộ quốc phòng là?",
+                options: [
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân.",
+                    "Đơn vị chủ lực cơ động và tác chiến chiến lược.",
+                    "Lực lượng nòng cốt quản lý, bảo vệ vùng trời và vùng biển, đảo của tổ quốc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng của quân khu là?",
+                options: [
+                    "Xây dựng nền quốc phòng toàn dân.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Đơn vị chủ lực cơ động và tác chiến chiến lược.",
+                    "Lực lượng nòng cốt quản lý, bảo vệ vùng trời và vùng biển, đảo của tổ quốc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng của quân đoàn là?",
+                options: [
+                    "Đơn vị chủ lực cơ động và tác chiến chiến lược.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân.",
+                    "Lực lượng nòng cốt quản lý, bảo vệ vùng trời và vùng biển, đảo của tổ quốc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng của quân chủng là?",
+                options: [
+                    "Lực lượng nòng cốt quản lý, bảo vệ vùng trời và vùng biển, đảo của tổ quốc.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân.",
+                    "Đơn vị chủ lực cơ động và tác chiến chiến lược."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng của binh chủng là?",
+                options: [
+                    "Trực tiếp chiến đấu hoặc đảm bảo chiến đấu.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân.",
+                    "Đơn vị chủ lực cơ động và tác chiến chiến lược."
+                ],
+                correct: 0
+            },
+            {
+                question: "Hệ thống cấp bậc quân hàm sĩ quan trong Quân đội nhân dân Việt Nam gồm bao nhiêu cấp, bao nhiêu bậc?",
+                options: [
+                    "Hệ thống cấp bậc quân hàm sĩ quan trong Quân đội nhân dân Việt Nam gồm 3 cấp, 12 bậc (Cấp Tá 4 bậc, Cấp Úy 4 bậc, Cấp Tướng 4 bậc).",
+                    "Hệ thống cấp bậc quân hàm sĩ quan trong Quân đội nhân dân Việt Nam gồm 2 cấp, 10 bậc.",
+                    "Hệ thống cấp bậc quân hàm sĩ quan trong Quân đội nhân dân Việt Nam gồm 4 cấp, 15 bậc.",
+                    "Hệ thống cấp bậc quân hàm sĩ quan trong Quân đội nhân dân Việt Nam gồm 3 cấp, 10 bậc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng của bộ công an là?",
+                options: [
+                    "Là cơ quan của Chính phủ, thực hiện chức năng quản lý nhà nước về trật tự, an toàn xã hội.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân.",
+                    "Đơn vị chủ lực cơ động và tác chiến chiến lược."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng của Bộ Tư lệnh Cảnh vệ?",
+                options: [
+                    "Thực hiện công tác cảnh vệ đảm bảo an toàn tuyệt đối cho cán bộ cấp cao của Đảng và Nhà nước Việt Nam, bảo vệ các nguyên thủ, khách quốc tế đến thăm và làm việc tại Việt Nam, bảo vệ các khu vực làm việc, các hoạt động, hội nghị của Đảng, Nhà nước Việt Nam.",
+                    "Là cơ quan của Chính phủ, thực hiện chức năng quản lý nhà nước về trật tự, an toàn xã hội.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chức năng Cục Cảnh sát giao thông?",
+                options: [
+                    "Tham mưu, hướng dẫn và tổ chức bảo đảm trật tự, an toàn giao thông; chủ động phòng ngừa, đấu tranh với các hành vi vi phạm pháp luật về giao thông.",
+                    "Là cơ quan của Chính phủ, thực hiện chức năng quản lý nhà nước về trật tự, an toàn xã hội.",
+                    "Quản lý nhà nước về lĩnh vực quân sự, quốc phòng trong phạm vi cả nước.",
+                    "Xây dựng nền quốc phòng toàn dân."
+                ],
+                correct: 0
+            },
+            {
+                question: "Sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có mấy cấp mấy bậc?",
+                options: [
+                    "Sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 2 cấp 7 bậc ( sĩ quan cấp tá 3 bậc- thiếu- trung- thượng, sĩ quan cấp úy 4 bậc- thiếu- trung- thượng- đại ).",
+                    "Sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 3 cấp 12 bậc.",
+                    "Sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 2 cấp 6 bậc.",
+                    "Sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 3 cấp 10 bậc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Sĩ quan chuyên môn nghiệp vụ trong Công An nhân dân gồm có mấy cấp mấy bậc?",
+                options: [
+                    "Sĩ quan chuyên môn nghiệp vụ trong Công An nhân dân gồm có 3 cấp, 12 bậc.",
+                    "Sĩ quan chuyên môn nghiệp vụ trong Công An nhân dân gồm có 2 cấp 7 bậc.",
+                    "Sĩ quan chuyên môn nghiệp vụ trong Công An nhân dân gồm có 2 cấp 6 bậc.",
+                    "Sĩ quan chuyên môn nghiệp vụ trong Công An nhân dân gồm có 3 cấp 10 bậc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Hạ sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có mấy bậc?",
+                options: [
+                    "Hạ sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 3 bậc(Thượng sĩ,Trung sĩ,Hạ sĩ).",
+                    "Hạ sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 2 bậc.",
+                    "Hạ sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 4 bậc.",
+                    "Hạ sĩ quan chuyên môn kĩ thuật trong Công An nhân dân gồm có 5 bậc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Chiến sĩ nghĩa vụ trong Công An nhân dân gồm có mấy bậc?",
+                options: [
+                    "Chiến sĩ nghĩa vụ trong Công An nhân dân gồm có 2 bậc (Chiến sĩ bậc 1, Chiến sĩ bậc 2).",
+                    "Chiến sĩ nghĩa vụ trong Công An nhân dân gồm có 1 bậc.",
+                    "Chiến sĩ nghĩa vụ trong Công An nhân dân gồm có 3 bậc.",
+                    "Chiến sĩ nghĩa vụ trong Công An nhân dân gồm có 4 bậc."
+                ],
+                correct: 0
+            },
+            {
+                question: "Hệ thống nhà trường trong Quân đội gồm có bao nhiêu học viện?",
+                options: [
+                    "Hệ thống nhà trường trong Quân đội gồm có 10 học viện (Học viện Quốc phòng, Học viện Chính trị Quân sự, Học viện Lục quân, Học viện Kỹ thuật Quân sự, Học viện Quân y, Học viện Hậu cần, Học viện Hải quân, Học viện Khoa học Quân sự, Học viện Phòng không - Không quân và Học viện Biên phòng).",
+                    "Hệ thống nhà trường trong Quân đội gồm có 8 học viện.",
+                    "Hệ thống nhà trường trong Quân đội gồm có 12 học viện.",
+                    "Hệ thống nhà trường trong Quân đội gồm có 15 học viện."
+                ],
+                correct: 0
+            },
+            {
+                question: "Hệ thống nhà trường trong Quân đội gồm có bao nhiêu trường đại học?",
+                options: [
+                    "Hệ thống nhà trường trong Quân đội gồm có 10 trường đại học",
+                    "Hệ thống nhà trường trong Quân đội gồm có 8 trường đại học",
+                    "Hệ thống nhà trường trong Quân đội gồm có 12 trường đại học",
+                    "Hệ thống nhà trường trong Quân đội gồm có 15 trường đại học"
+                ],
+                correct: 0
+            },
+            {
+                question: "Đối tượng tuyển sinh là Hạ sĩ quan, binh sĩ tại ngũ theo quy định của pháp luật về nghĩa vụ quân sự, có thời gian phục vụ tại ngũ đủ bao nhiêu tháng tuổi quân?",
+                options: [
+                    "Thời gian phục vụ tại ngũ đủ để tham gia tuyển sinh là từ đủ 12 tháng trở lên.",
+                    "Thời gian phục vụ tại ngũ đủ để tham gia tuyển sinh là từ đủ 6 tháng trở lên.",
+                    "Thời gian phục vụ tại ngũ đủ để tham gia tuyển sinh là từ đủ 18 tháng trở lên.",
+                    "Thời gian phục vụ tại ngũ đủ để tham gia tuyển sinh là từ đủ 24 tháng trở lên."
+                ],
+                correct: 0
+            },
+            {
+                question: "Tuổi đời đối với Thanh niên ngoài Quân đội không quá bao nhiêu tuổi?",
+                options: [
+                    "Tuổi đời đối với Thanh niên ngoài Quân đội (tính đến năm dự tuyển) không quá 21.",
+                    "Tuổi đời đối với Thanh niên ngoài Quân đội (tính đến năm dự tuyển) không quá 22.",
+                    "Tuổi đời đối với Thanh niên ngoài Quân đội (tính đến năm dự tuyển) không quá 23.",
+                    "Tuổi đời đối với Thanh niên ngoài Quân đội (tính đến năm dự tuyển) không quá 24."
+                ],
+                correct: 0
+            },
+            {
+                question: "Hệ thống nhà trường trong Công An gồm có bao nhiêu học viện?",
+                options: [
+                    "Hệ thống nhà trường trong Công an nhân dân gồm 4 học viện (viện An ninh nhân dân, Học viện Cảnh sát nhân dân, Học viện Chính trị Công an nhân dân và Học viện Quốc tế).",
+                    "Hệ thống nhà trường trong Công an nhân dân gồm 3 học viện.",
+                    "Hệ thống nhà trường trong Công an nhân dân gồm 5 học viện.",
+                    "Hệ thống nhà trường trong Công an nhân dân gồm 6 học viện."
+                ],
+                correct: 0
+            },
+            {
+                question: "Hệ thống nhà trường trong Công An gồm có bao nhiêu trường đại học?",
+                options: [
+                    "4 trường đại học ( Đại học An ninh nhân dân, đại học Cảnh sát nhân dân, Đại học Phòng cháy chữa cháy, Đại học Kỹ thuật - Hậu cần Công an nhân dân).",
+                    "3 trường đại học.",
+                    "5 trường đại học.",
+                    "6 trường đại học."
+                ],
+                correct: 0
+            },
+            {
+                question: "Phương thức tuyển sinh của các trường công an gồm có mấy phương thức?",
+                options: [
+                    "3 phương thức ( thi tuyển, xét tuyển, kết hợp giữa thi tuyển và xét tuyển).",
+                    "2 phương thức ( thi tuyển, xét tuyển).",
+                    "4 phương thức ( thi tuyển, xét tuyển, kết hợp giữa thi tuyển và xét tuyển, tuyển thẳng).",
+                    "5 phương thức ( thi tuyển, xét tuyển, kết hợp giữa thi tuyển và xét tuyển, tuyển thẳng, ưu tiên)."
+                ],
+                correct: 0
+            }
+        ];
+
+        // Quiz Application
+        class QuizApp {
+            constructor() {
+                this.questions = [];
+                this.currentQuestion = 0;
+                this.userAnswers = [];
+                this.startTime = null;
+                this.timerInterval = null;
+                this.isReviewMode = false;
+                
+                this.init();
+            }
+            
+            init() {
+                // Shuffle questions and options
+                this.shuffleQuestions();
+                
+                // Initialize UI
+                this.renderQuestions();
+                this.updateProgress();
+                this.showQuestion(0);
+                
+                // Setup event listeners
+                this.setupEventListeners();
+                
+                // Start timer
+                this.startTimer();
+                
+                // Initialize WebGL
+                initWebGL();
+            }
+            
+            shuffleQuestions() {
+                // Shuffle questions
+                this.questions = [...quizData];
+                for (let i = this.questions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [this.questions[i], this.questions[j]] = [this.questions[j], this.questions[i]];
+                }
+                
+                // Shuffle options for each question and track correct answer
+                this.questions = this.questions.map(q => {
+                    const options = [...q.options];
+                    const correctAnswer = options[q.correct];
+                    
+                    // Shuffle options
+                    for (let i = options.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [options[i], options[j]] = [options[j], options[i]];
+                    }
+                    
+                    // Find new correct answer index
+                    const newCorrectIndex = options.indexOf(correctAnswer);
+                    
+                    return {
+                        ...q,
+                        options,
+                        correct: newCorrectIndex
+                    };
+                });
+                
+                // Initialize user answers array
+                this.userAnswers = new Array(this.questions.length).fill(null);
+            }
+            
+            renderQuestions() {
+                const quizContent = document.getElementById('quiz-content');
+                quizContent.innerHTML = '';
+                
+                this.questions.forEach((q, index) => {
+                    const questionContainer = document.createElement('div');
+                    questionContainer.className = `question-container ${index === 0 ? 'active' : ''}`;
+                    questionContainer.dataset.index = index;
+                    
+                    const optionsHTML = q.options.map((option, optionIndex) => `
+                        <div class="option" data-question="${index}" data-option="${optionIndex}">
+                            <div class="option-letter">${String.fromCharCode(65 + optionIndex)}</div>
+                            <div class="option-text">${option}</div>
+                        </div>
+                    `).join('');
+                    
+                    questionContainer.innerHTML = `
+                        <div class="question-header">
+                            <div class="question-number">Câu ${index + 1}</div>
+                        </div>
+                        <div class="question-text">${q.question}</div>
+                        <div class="options-container">
+                            ${optionsHTML}
+                        </div>
+                    `;
+                    
+                    quizContent.appendChild(questionContainer);
+                });
+            }
+            
+            showQuestion(index) {
+                const questionContainers = document.querySelectorAll('.question-container');
+                
+                questionContainers.forEach(container => {
+                    container.classList.remove('active');
+                });
+                
+                questionContainers[index].classList.add('active');
+                
+                // Update button states
+                document.getElementById('prev-btn').disabled = index === 0;
+                document.getElementById('next-btn').textContent = 
+                    index === this.questions.length - 1 ? 'Nộp bài' : 'Câu tiếp theo';
+                
+                // Update current question index
+                this.currentQuestion = index;
+            }
+            
+            updateProgress() {
+                const progress = document.getElementById('progress');
+                const percentage = ((this.currentQuestion + 1) / this.questions.length) * 100;
+                progress.style.width = `${percentage}%`;
+            }
+            
+            selectOption(questionIndex, optionIndex) {
+                if (this.isReviewMode) return;
+                
+                // Update user answer
+                this.userAnswers[questionIndex] = optionIndex;
+                
+                // Update UI
+                const options = document.querySelectorAll(`.option[data-question="${questionIndex}"]`);
+                options.forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                const selectedOption = document.querySelector(`.option[data-question="${questionIndex}"][data-option="${optionIndex}"]`);
+                selectedOption.classList.add('selected');
+            }
+            
+            nextQuestion() {
+                if (this.currentQuestion < this.questions.length - 1) {
+                    this.showQuestion(this.currentQuestion + 1);
+                    this.updateProgress();
+                } else {
+                    this.submitQuiz();
+                }
+            }
+            
+            prevQuestion() {
+                if (this.currentQuestion > 0) {
+                    this.showQuestion(this.currentQuestion - 1);
+                    this.updateProgress();
+                }
+            }
+            
+            submitQuiz() {
+                clearInterval(this.timerInterval);
+                
+                // Calculate score
+                let correctCount = 0;
+                this.userAnswers.forEach((answer, index) => {
+                    if (answer === this.questions[index].correct) {
+                        correctCount++;
+                    }
+                });
+                
+                // Calculate time spent
+                const timeSpent = this.getFormattedTime();
+                
+                // Show results
+                this.showResults(correctCount, timeSpent);
+            }
+            
+            showResults(correctCount, timeSpent) {
+                const modal = document.getElementById('result-modal');
+                const scoreElement = document.getElementById('score');
+                const scoreMessage = document.getElementById('score-message');
+                const correctAnswersElement = document.getElementById('correct-answers');
+                const timeSpentElement = document.getElementById('time-spent');
+                
+                scoreElement.textContent = `${correctCount}/${this.questions.length}`;
+                
+                // Set score message based on percentage
+                const percentage = (correctCount / this.questions.length) * 100;
+                let message = '';
+                
+                if (percentage >= 90) {
+                    message = 'Xuất sắc! Bạn đã làm rất tốt!';
+                } else if (percentage >= 80) {
+                    message = 'Tốt! Bạn có kiến thức vững chắc về môn học.';
+                } else if (percentage >= 70) {
+                    message = 'Khá! Bạn cần ôn tập thêm một số phần.';
+                } else if (percentage >= 60) {
+                    message = 'Trung bình! Bạn cần cố gắng hơn nữa.';
+                } else {
+                    message = 'Bạn cần ôn tập lại kiến thức của mình.';
+                }
+                
+                scoreMessage.textContent = message;
+                correctAnswersElement.textContent = `Số câu trả lời đúng: ${correctCount}/${this.questions.length}`;
+                timeSpentElement.textContent = `Thời gian làm bài: ${timeSpent}`;
+                
+                modal.classList.add('active');
+            }
+            
+            reviewAnswers() {
+                this.isReviewMode = true;
+                
+                // Hide modal
+                document.getElementById('result-modal').classList.remove('active');
+                
+                // Show all questions with correct/incorrect indicators
+                const questionContainers = document.querySelectorAll('.question-container');
+                questionContainers.forEach((container, index) => {
+                    container.classList.add('active');
+                    
+                    const options = container.querySelectorAll('.option');
+                    options.forEach((option, optionIndex) => {
+                        if (optionIndex === this.questions[index].correct) {
+                            option.classList.add('correct');
+                        } else if (optionIndex === this.userAnswers[index] && optionIndex !== this.questions[index].correct) {
+                            option.classList.add('incorrect');
+                        }
+                    });
+                });
+                
+                // Hide navigation buttons
+                document.getElementById('prev-btn').style.display = 'none';
+                document.getElementById('next-btn').style.display = 'none';
+            }
+            
+            restartQuiz() {
+                // Reset state
+                this.currentQuestion = 0;
+                this.userAnswers = [];
+                this.isReviewMode = false;
+                
+                // Hide modal
+                document.getElementById('result-modal').classList.remove('active');
+                
+                // Show navigation buttons
+                document.getElementById('prev-btn').style.display = 'flex';
+                document.getElementById('next-btn').style.display = 'flex';
+                
+                // Reset and shuffle questions
+                this.shuffleQuestions();
+                
+                // Re-render questions
+                this.renderQuestions();
+                this.updateProgress();
+                this.showQuestion(0);
+                
+                // Reset timer
+                clearInterval(this.timerInterval);
+                this.startTime = Date.now();
+                this.startTimer();
+            }
+            
+            startTimer() {
+                this.startTime = Date.now();
+                
+                this.timerInterval = setInterval(() => {
+                    const elapsed = Date.now() - this.startTime;
+                    document.getElementById('timer').textContent = this.getFormattedTime(elapsed);
+                }, 1000);
+            }
+            
+            getFormattedTime(elapsed) {
+                if (!elapsed) {
+                    elapsed = Date.now() - this.startTime;
+                }
+                
+                const totalSeconds = Math.floor(elapsed / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            setupEventListeners() {
+                // Option click
+                document.addEventListener('click', (e) => {
+                    if (e.target.closest('.option')) {
+                        const option = e.target.closest('.option');
+                        const questionIndex = parseInt(option.dataset.question);
+                        const optionIndex = parseInt(option.dataset.option);
+                        this.selectOption(questionIndex, optionIndex);
+                    }
+                });
+                
+                // Navigation buttons
+                document.getElementById('next-btn').addEventListener('click', () => {
+                    this.nextQuestion();
+                });
+                
+                document.getElementById('prev-btn').addEventListener('click', () => {
+                    this.prevQuestion();
+                });
+                
+                // Modal buttons
+                document.getElementById('review-btn').addEventListener('click', () => {
+                    this.reviewAnswers();
+                });
+                
+                document.getElementById('restart-btn').addEventListener('click', () => {
+                    this.restartQuiz();
+                });
+            }
+        }
+        
+        // Initialize the quiz when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new QuizApp();
+        });
+    </script>
+</body>
+</html>
