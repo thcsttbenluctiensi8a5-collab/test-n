@@ -7,11 +7,12 @@
   },
   {
     "title": "test snake",
-    "description": "chỉ là test thao tác thôi",
+    "description": "chỉ là test thao tác",
     "file": "quizzes/Snake.html",
     "icon": "fa-shield-halved"
   }
 ]
+
 
 
 
