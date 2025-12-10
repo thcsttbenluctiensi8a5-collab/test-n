@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook - Đăng nhập hoặc đăng ký</title>
+    <style>
+        /* --- CSS SETUP --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "SFProDisplay-Regular", Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            overflow: hidden; /* Ẩn thanh cuộn để WebGL full màn hình */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* --- WEBGL CANVAS --- */
+        #glcanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1; /* Đẩy xuống dưới cùng */
+        }
+
+        /* --- FACEBOOK UI LAYOUT --- */
+        .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 980px;
+            width: 100%;
+            padding: 0 20px;
+            z-index: 10; /* Nổi lên trên canvas */
+        }
+
+        /* Phần bên trái: Logo và Slogan */
+        .left-box {
+            width: 58%;
+            padding-right: 32px;
+            margin-bottom: 50px;
+        }
+
+        .logo {
+            height: 106px;
+            margin: -28px;
+        }
+
+        .slogan {
+            font-size: 28px;
+            font-weight: normal;
+            line-height: 32px;
+            width: 500px;
+            margin-top: 10px;
+        }
+
+        /* Phần bên phải: Form đăng nhập */
+        .right-box {
+            width: 396px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .login-card {
+            background-color: #fff;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, .1), 0 8px 16px rgba(0, 0, 0, .1);
+            padding: 20px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+            font-size: 17px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: #1877f2;
+            box-shadow: 0 0 0 2px #e7f3ff;
+        }
+
+        .btn-login {
+            background-color: #1877f2;
+            border: none;
+            border-radius: 6px;
+            font-size: 20px;
+            line-height: 48px;
+            padding: 0 16px;
+            width: 100%;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-login:hover {
+            background-color: #166fe5;
+        }
+
+        .forgot-password {
+            color: #1877f2;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            margin-top: 16px;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            border-bottom: 1px solid #dadde1;
+            margin: 0 0 20px 0;
+        }
+
+        .btn-create {
+            background-color: #42b72a;
+            border: none;
+            border-radius: 6px;
+            font-size: 17px;
+            line-height: 48px;
+            padding: 0 16px;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+
+        .btn-create:hover {
+            background-color: #36a420;
+        }
+
+        .create-page-text {
+            margin-top: 28px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .create-page-text a {
+            text-decoration: none;
+            color: #1c1e21;
+            font-weight: bold;
+        }
+
+        .create-page-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive Mobile */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+                padding-top: 20px;
+            }
+            .left-box {
+                width: 100%;
+                text-align: center;
+                padding-right: 0;
+                margin-bottom: 20px;
+            }
+            .slogan {
+                width: 100%;
+                font-size: 24px;
+            }
+            .logo {
+                height: 80px;
+                margin: 0 auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- WebGL Background Canvas -->
+    <canvas id="glcanvas"></canvas>
+
+    <div class="container">
+        <!-- Left Side -->
+        <div class="left-box">
+            <!-- Facebook Logo (SVG) -->
+            <h2 class="slogan">Facebook giúp bạn kết nối và chia sẻ với mọi người trong cuộc sống của bạn.</h2>
+        </div>
+
+        <!-- Right Side -->
+        <div class="right-box">
+            <div class="login-card">
+                <form id="loginForm">
+                    <input type="text" class="form-input" placeholder="Email hoặc số điện thoại" required>
+                    <input type="password" class="form-input" placeholder="Mật khẩu" required>
+                    <button type="submit" class="btn-login">Đăng nhập</button>
+                    <a href="#" class="forgot-password">Quên mật khẩu?</a>
+                    <div class="divider"></div>
+                    <button type="button" class="btn-create">Tạo tài khoản mới</button>
+                </form>
+            </div>
+            <div class="create-page-text">
+                <a href="#">Tạo Trang</a> dành cho người nổi tiếng, thương hiệu hoặc doanh nghiệp.
+            </div>
+        </div>
+    </div>
+
+<!-- JAVASCRIPT & WEBGL2 LOGIC -->
+    <script>
+        // --- LOGIC GIAO DIỆN CƠ BẢN ---
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // Ngăn không cho form load lại trang
+            const inputs = this.querySelectorAll('input');
+            let email = inputs[0].value;
+            let pass = inputs[1].value;
+
+            // Kiểm tra xem người dùng đã nhập đủ chưa
+            if(email && pass) {
+                // Hiển thị thông báo troll
+                alert('Cảm ơn bạn. Tài khoản của bạn đã được tải lên máy chủ của chúng tôi để sử dụng cho mục đích cá nhân. Chúc bạn một ngày tốt lành! <3');
+                
+                // (Tùy chọn) Xóa trắng ô nhập liệu để tăng độ "uy tín"
+                inputs[0].value = '';
+                inputs[1].value = '';
+            } else {
+                alert('Vui lòng nhập đầy đủ thông tin!');
+            }
+        });
+
+        // --- WEBGL2 SETUP ---
+        const canvas = document.getElementById('glcanvas');
+        const gl = canvas.getContext('webgl2');
+
+        if (!gl) {
+            console.error("Trình duyệt của bạn không hỗ trợ WebGL2.");
+        } else {
+            // Resize canvas to full window
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            // 1. Vertex Shader
+            const vsSource = `#version 300 es
+            in vec4 a_position;
+            void main() {
+                gl_Position = a_position;
+            }`;
+
+            // 2. Fragment Shader
+            const fsSource = `#version 300 es
+            precision highp float;
+            
+            uniform vec2 u_resolution;
+            uniform float u_time;
+            out vec4 outColor;
+
+            void main() {
+                vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+                
+                // Màu nền chuẩn của Facebook (#f0f2f5)
+                vec3 baseColor = vec3(0.941, 0.949, 0.960); 
+                
+                // Màu xanh Facebook (#1877f2) nhạt
+                vec3 blueColor = vec3(0.094, 0.466, 0.949);
+
+                // Tạo chuyển động sóng sin đơn giản
+                float wave1 = sin(uv.x * 10.0 + u_time * 0.5) * 0.5 + 0.5;
+                float wave2 = cos(uv.y * 8.0 + u_time * 0.3) * 0.5 + 0.5;
+                
+                // Hiệu ứng bong bóng mờ
+                float dist = distance(uv, vec2(0.5 + sin(u_time * 0.4)*0.3, 0.5 + cos(u_time * 0.2)*0.3));
+                float glow = 1.0 - smoothstep(0.0, 0.8, dist);
+
+                // Trộn màu
+                vec3 finalColor = mix(baseColor, blueColor, glow * 0.15 + wave1 * wave2 * 0.05);
+
+                outColor = vec4(finalColor, 1.0);
+            }`;
+
+            // Helper: Compile Shader
+            function createShader(gl, type, source) {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    console.error(gl.getShaderInfoLog(shader));
+                    gl.deleteShader(shader);
+                    return null;
+                }
+                return shader;
+            }
+
+            // Helper: Create Program
+            function createProgram(gl, vs, fs) {
+                const program = gl.createProgram();
+                gl.attachShader(program, vs);
+                gl.attachShader(program, fs);
+                gl.linkProgram(program);
+                if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                    console.error(gl.getProgramInfoLog(program));
+                    return null;
+                }
+                return program;
+            }
+
+            const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+            const program = createProgram(gl, vs, fs);
+
+            // Attribute / Uniform Locations
+            const positionLoc = gl.getAttribLocation(program, "a_position");
+            const resolutionLoc = gl.getUniformLocation(program, "u_resolution");
+            const timeLoc = gl.getUniformLocation(program, "u_time");
+
+            // Buffer setup
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            const positions = [
+                -1, -1,
+                 1, -1,
+                -1,  1,
+                -1,  1,
+                 1, -1,
+                 1,  1,
+            ];
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+            // Vertex Array Object
+            const vao = gl.createVertexArray();
+            gl.bindVertexArray(vao);
+            gl.enableVertexAttribArray(positionLoc);
+            gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+            // Render Loop
+            function render(time) {
+                time *= 0.001; 
+                gl.useProgram(program);
+                gl.bindVertexArray(vao);
+                gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
+                gl.uniform1f(timeLoc, time);
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        }
+    </script>
+</body>
+</html>
