@@ -4,5 +4,17 @@
     "description": "Trắc nghiệm ôn tập giữa kì QPAN",
     "file": "quizzes/ktgkqpan.html",
     "icon": "fa-shield-halved"
+  },
+  {
+    "title": "game snake",
+    "description": "nó là game test",
+    "file": "quizzes/Snake.html",
+    "icon": "fa-shield-halved"
+  },
+  {
+    "title": "facebook giả",
+    "description": "no comment",
+    "file": "quizzes/Facebook.html",
+    "icon": "fa-shield-halved"
   }
 ]
