@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Raymarching Snake Game - WebGL2 Engine</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #111; }
+        canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+        
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+            padding: 20px; box-sizing: border-box;
+        }
+        #score-board {
+            color: #0f0; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold;
+            text-shadow: 0 0 10px #0f0;
+        }
+        #controls-hint {
+            color: #aaa; font-family: sans-serif; font-size: 14px; text-align: center;
+            text-shadow: 0 0 5px #000;
+        }
+        
+        #debug-panel {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(0, 0, 0, 0.85); color: #0f0;
+            font-family: 'Consolas', monospace; font-size: 12px;
+            padding: 10px; border: 1px solid #333; border-radius: 4px;
+            pointer-events: none; display: none; box-shadow: 0 0 10px rgba(0,255,0,0.2);
+        }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; min-width: 150px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gl-canvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="score-board">SCORE: 0</div>
+        <div id="controls-hint">Sử dụng phím Mũi Tên để di chuyển<br>Shift+1: Debug Info</div>
+    </div>
+
+    <div id="debug-panel">
+        <div style="text-align:center; border-bottom:1px solid #444; margin-bottom:5px; color:#fff">ENGINE STATS</div>
+        <div class="stat-row"><span>FPS:</span><span id="stat-fps">0</span></div>
+        <div class="stat-row"><span>Res:</span><span id="stat-res">0x0</span></div>
+        <div class="stat-row"><span>Snake Len:</span><span id="stat-len">0</span></div>
+    </div>
+
+    <!-- ========================================================================================== -->
+    <!-- WORKER: LOGIC (Tính toán hiệu ứng phụ) -->
+    <!-- ========================================================================================== -->
+    <script id="worker-logic" type="javascript/worker">
+        self.onmessage = function(e) {
+            const { type, payload } = e.data;
+            if (type === 'CALC_PULSE') {
+                // Tính toán hiệu ứng "thở" cho thức ăn dựa trên thời gian
+                const t = payload.time;
+                const pulse = 1.0 + Math.sin(t * 0.005) * 0.1; 
+                
+                self.postMessage({
+                    type: 'PULSE_RESULT',
+                    payload: { pulse: pulse }
+                });
+            }
+        };
+    </script>
+
+    <!-- ========================================================================================== -->
+    <!-- WORKER: RENDER (WebGL2 Raymarching Shader) -->
+    <!-- ========================================================================================== -->
+    <script id="worker-render" type="javascript/worker">
+        let gl, program, postProgram;
+        let vao, postVAO;
+        let texture;
+        let width, height;
+        
+        // Game State trong Render Worker
+        let snakeData = new Float32Array(200); // Max 100 segments (x,y)
+        let snakeLength = 0;
+        let foodPos = [0.5, 0.5]; // Array, not Object
+        let foodPulse = 1.0;
+        let frameCount = 0;
+        let lastFpsTime = 0;
+
+        // --- SHADERS ---
+        const vsSource = `#version 300 es
+        in vec2 a_position;
+        out vec2 v_uv;
+        void main() {
+            v_uv = a_position * 0.5 + 0.5; // 0.0 to 1.0
+            gl_Position = vec4(a_position, 0.0, 1.0);
+        }
+        `;
+
+        // Fragment Shader: Ray Marching / SDF Rendering
+        const fsSource = `#version 300 es
+        precision highp float;
+        
+        in vec2 v_uv;
+        
+        uniform sampler2D u_emojiTex;
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        
+        // Game Data
+        uniform vec2 u_snake[100]; // Array vị trí các đốt rắn (Normalized 0-1)
+        uniform int u_length;
+        uniform vec2 u_food;
+        uniform float u_pulse;
+
+        out vec4 outColor;
+
+        // Smooth Minimum (để nối các đốt rắn lại với nhau mềm mại)
+        float smin(float a, float b, float k) {
+            float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+            return mix(b, a, h) - k * h * (1.0 - h);
+        }
+
+        // Signed Distance Function cho hình tròn
+        float sdCircle(vec2 p, float r) {
+            return length(p) - r;
+        }
+
+        void main() {
+            // Chỉnh lại UV theo tỷ lệ màn hình để không bị méo
+            vec2 uv = v_uv;
+            float aspect = u_resolution.x / u_resolution.y;
+            vec2 p = uv;
+            p.x *= aspect;
+
+            // --- RAY MARCHING / SDF SCENE ---
+            
+            // 1. Tính SDF cho Rắn
+            float dSnake = 100.0;
+            float radius = 0.025; // Kích thước đốt rắn
+            
+            // Duyệt qua mảng vị trí rắn
+            for(int i = 0; i < 100; i++) {
+                if(i >= u_length) break;
+                
+                vec2 segPos = u_snake[i];
+                segPos.x *= aspect; // Fix aspect ratio cho vị trí
+                
+                float dSeg = sdCircle(p - segPos, radius);
+                
+                // Blend các đốt lại (Metaballs)
+                dSnake = smin(dSnake, dSeg, 0.02); 
+            }
+
+            // 2. Tính SDF cho Thức ăn (Táo)
+            vec2 fPos = u_food;
+            fPos.x *= aspect;
+            float dFood = sdCircle(p - fPos, radius * u_pulse);
+
+            // --- RENDERING / LIGHTING ---
+            vec3 color = vec3(0.1, 0.1, 0.12); // Background
+
+            // Vẽ Rắn
+            if(dSnake < 0.0) {
+                // Giả lập 3D Normal dựa trên SDF gradient
+                vec2 eps = vec2(0.001, 0.0);
+                // Tính normal xấp xỉ
+                // (Lưu ý: đây là hack nhanh trong loop, chuẩn ra phải tính gradient riêng)
+                float nx = dSnake - smin(dSnake, sdCircle(p - eps - vec2(0), radius), 0.02); 
+                // Đơn giản hóa: dùng vector từ tâm đốt gần nhất (khó trong loop).
+                // Dùng kỹ thuật fake lighting 2D:
+                float h = smoothstep(0.0, -radius, dSnake); // Height map
+                vec3 col = vec3(0.0, 0.8, 0.2); // Màu xanh rắn
+                
+                // Texture mapping (Lấy phần da rắn từ texture)
+                vec4 tex = texture(u_emojiTex, v_uv * 3.0 + vec2(u_time*0.1, 0.0)); 
+                col = mix(col, tex.rgb, 0.3);
+
+                // Rim light
+                col += vec3(0.5) * smoothstep(0.8, 1.0, h);
+                
+                // Nếu là đầu rắn (index 0), đổi màu chút
+                vec2 headPos = u_snake[0];
+                headPos.x *= aspect;
+                if(length(p - headPos) < radius * 1.2) {
+                     col = vec3(0.2, 0.9, 0.3); // Sáng hơn
+                     // Mắt
+                     // (Code vẽ mắt đơn giản bằng SDF)
+                }
+
+                color = col;
+            }
+
+            // Vẽ Thức ăn
+            if(dFood < 0.0) {
+                vec2 uvFood = (p - fPos) / (radius * 2.0 * u_pulse) + 0.5;
+                // Lấy texture quả táo (giả sử texture atlas bên phải)
+                // Ở đây ta dùng màu đỏ + lighting cho đơn giản vì map texture emoji vào SDF tròn cần UV chuẩn
+                vec3 col = vec3(1.0, 0.2, 0.1);
+                
+                // Fake 3D sphere look
+                float dist = length(p - fPos);
+                float highlight = 1.0 - smoothstep(0.0, radius*0.5, dist - 0.005);
+                col += vec3(0.8) * highlight;
+                
+                color = col;
+            }
+
+            // Glow Effect (Đặc trưng Raymarching)
+            color += vec3(0.0, 1.0, 0.0) * (0.002 / abs(dSnake)); // Glow rắn
+            color += vec3(1.0, 0.2, 0.0) * (0.002 / abs(dFood));  // Glow thức ăn
+
+            outColor = vec4(color, 1.0);
+        }
+        `;
+
+        // Post Processing: CRT Effect + Vignette
+        const vsPost = `#version 300 es
+        in vec2 a_position;
+        out vec2 v_uv;
+        void main() {
+            v_uv = a_position * 0.5 + 0.5;
+            gl_Position = vec4(a_position, 0.0, 1.0);
+        }
+        `;
+
+        const fsPost = `#version 300 es
+        precision mediump float;
+        in vec2 v_uv;
+        uniform sampler2D u_texture;
+        out vec4 outColor;
+        
+        void main() {
+            vec2 uv = v_uv;
+            // Chromatic Aberration
+            float r = texture(u_texture, uv + vec2(0.002, 0.0)).r;
+            float g = texture(u_texture, uv).g;
+            float b = texture(u_texture, uv - vec2(0.002, 0.0)).b;
+            
+            vec3 col = vec3(r, g, b);
+            
+            // Vignette
+            float vig = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
+            col *= pow(vig * 15.0, 0.25);
+            
+            // Scanlines
+            col *= 0.9 + 0.1 * sin(uv.y * 800.0);
+
+            outColor = vec4(col, 1.0);
+        }
+        `;
+
+        function createProgram(gl, vs, fs) {
+            const p = gl.createProgram();
+            const v = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(v, vs); gl.compileShader(v);
+            const f = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(f, fs); gl.compileShader(f);
+            gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
+            if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+                console.error(gl.getShaderInfoLog(v));
+                console.error(gl.getShaderInfoLog(f));
+                console.error(gl.getProgramInfoLog(p));
+            }
+            return p;
+        }
+
+        self.onmessage = function(e) {
+            const { type, payload } = e.data;
+
+            if (type === 'INIT') {
+                const canvas = payload.canvas;
+                width = payload.width;
+                height = payload.height;
+                gl = canvas.getContext('webgl2');
+
+                program = createProgram(gl, vsSource, fsSource);
+                postProgram = createProgram(gl, vsPost, fsPost);
+
+                // Fullscreen Quad
+                const verts = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
+                
+                vao = gl.createVertexArray();
+                gl.bindVertexArray(vao);
+                const buf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+                gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(0);
+                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+                postVAO = gl.createVertexArray(); // Reuse same buffer logic
+                gl.bindVertexArray(postVAO);
+                gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+                gl.enableVertexAttribArray(0);
+                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+                setupFramebuffer(width, height);
+                requestAnimationFrame(renderLoop);
+
+            } else if (type === 'SET_TEXTURE') {
+                texture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, payload);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            } else if (type === 'UPDATE_GAME') {
+                // Nhận dữ liệu game từ Main Thread
+                snakeLength = payload.length;
+                
+                // --- FIX LỖI TẠI ĐÂY ---
+                // Chuyển Object {x,y} thành Array [x,y] để WebGL hiểu
+                foodPos = [payload.food.x, payload.food.y];
+                
+                // Copy dữ liệu vào Float32Array để upload uniform
+                for(let i=0; i<snakeLength; i++) {
+                    snakeData[i*2] = payload.snake[i].x;
+                    snakeData[i*2+1] = payload.snake[i].y;
+                }
+                foodPulse = payload.pulse;
+            } else if (type === 'RESIZE') {
+                width = payload.width;
+                height = payload.height;
+                gl.viewport(0, 0, width, height);
+                setupFramebuffer(width, height);
+            }
+        };
+
+        let fb, targetTex;
+        function setupFramebuffer(w, h) {
+            if (fb) gl.deleteFramebuffer(fb);
+            if (targetTex) gl.deleteTexture(targetTex);
+            targetTex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, targetTex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            fb = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, targetTex, 0);
+        }
+
+        function renderLoop(time) {
+            frameCount++;
+            if (time - lastFpsTime >= 1000) {
+                self.postMessage({ type: 'STATS', fps: frameCount });
+                frameCount = 0;
+                lastFpsTime = time;
+            }
+
+            // Pass 1: Draw Scene (SDF) to Framebuffer
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+            gl.viewport(0, 0, width, height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.useProgram(program);
+
+            // Upload Uniforms
+            gl.uniform2f(gl.getUniformLocation(program, "u_resolution"), width, height);
+            gl.uniform1f(gl.getUniformLocation(program, "u_time"), time * 0.001);
+            gl.uniform1i(gl.getUniformLocation(program, "u_length"), snakeLength);
+            gl.uniform2fv(gl.getUniformLocation(program, "u_snake"), snakeData); // Upload array
+            
+            // Bây giờ foodPos đã là Array, hàm này sẽ chạy đúng
+            gl.uniform2fv(gl.getUniformLocation(program, "u_food"), foodPos);
+            
+            gl.uniform1f(gl.getUniformLocation(program, "u_pulse"), foodPulse);
+            
+            if(texture) {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.uniform1i(gl.getUniformLocation(program, "u_emojiTex"), 0);
+            }
+
+            gl.bindVertexArray(vao);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            // Pass 2: Post Processing
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, width, height);
+            gl.useProgram(postProgram);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, targetTex);
+            gl.bindVertexArray(postVAO);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            requestAnimationFrame(renderLoop);
+        }
+    </script>
+
+    <!-- ========================================================================================== -->
+    <!-- MAIN ENGINE CODE -->
+    <!-- ========================================================================================== -->
+    <script>
+        class Engine {
+            constructor() {
+                this.canvas = document.getElementById('gl-canvas');
+                this.renderWorker = null;
+                this.logicWorker = null;
+                
+                // Game State
+                this.gridSize = 20; // Lưới 20x20 (ảo)
+                this.snake = [{x: 0.5, y: 0.5}]; // Tọa độ chuẩn hóa 0.0 - 1.0
+                this.direction = {x: 0.02, y: 0}; // Bước di chuyển
+                this.nextDirection = {x: 0.02, y: 0};
+                this.food = {x: 0.8, y: 0.5};
+                this.score = 0;
+                this.lastMoveTime = 0;
+                this.moveInterval = 100; // Tốc độ game (ms)
+                this.foodPulse = 1.0;
+
+                this.init();
+            }
+
+            init() {
+                // Setup Render Worker
+                const renderBlob = new Blob([document.getElementById('worker-render').textContent], { type: 'application/javascript' });
+                this.renderWorker = new Worker(URL.createObjectURL(renderBlob));
+                this.renderWorker.onmessage = (e) => this.handleRenderMessage(e);
+
+                // Setup Logic Worker
+                const logicBlob = new Blob([document.getElementById('worker-logic').textContent], { type: 'application/javascript' });
+                this.logicWorker = new Worker(URL.createObjectURL(logicBlob));
+                this.logicWorker.onmessage = (e) => {
+                    if(e.data.type === 'PULSE_RESULT') this.foodPulse = e.data.payload.pulse;
+                };
+
+                // Canvas Setup
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = window.innerWidth * dpr;
+                this.canvas.height = window.innerHeight * dpr;
+                const offscreen = this.canvas.transferControlToOffscreen();
+                
+                this.renderWorker.postMessage({
+                    type: 'INIT',
+                    payload: { canvas: offscreen, width: this.canvas.width, height: this.canvas.height }
+                }, [offscreen]);
+
+                // Generate Emoji Texture
+                this.createEmojiTexture();
+
+                // Input Handling
+                window.addEventListener('keydown', (e) => this.handleInput(e));
+                window.addEventListener('resize', () => {
+                    this.renderWorker.postMessage({
+                        type: 'RESIZE',
+                        payload: { width: window.innerWidth * dpr, height: window.innerHeight * dpr }
+                    });
+                });
+
+                // Start Loop
+                requestAnimationFrame((t) => this.gameLoop(t));
+            }
+
+            createEmojiTexture() {
+                const c = document.createElement('canvas');
+                c.width = 256; c.height = 256;
+                const ctx = c.getContext('2d');
+                // Vẽ texture da rắn
+                ctx.fillStyle = '#004400';
+                ctx.fillRect(0,0,256,256);
+                ctx.font = "200px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("🐍", 128, 128); // Dùng emoji làm pattern
+
+                createImageBitmap(c).then(bmp => {
+                    this.renderWorker.postMessage({ type: 'SET_TEXTURE', payload: bmp }, [bmp]);
+                });
+            }
+
+            handleInput(e) {
+                const step = 0.025; // Kích thước bước nhảy (tương ứng radius trong shader)
+                // Aspect ratio correction logic should be here ideally, but keeping simple
+                const aspect = this.canvas.width / this.canvas.height;
+                const stepX = step / aspect; 
+                const stepY = step;
+
+                switch(e.key) {
+                    case 'ArrowUp': if(this.direction.y === 0) this.nextDirection = {x: 0, y: stepY}; break;
+                    case 'ArrowDown': if(this.direction.y === 0) this.nextDirection = {x: 0, y: -stepY}; break;
+                    case 'ArrowLeft': if(this.direction.x === 0) this.nextDirection = {x: -stepX, y: 0}; break;
+                    case 'ArrowRight': if(this.direction.x === 0) this.nextDirection = {x: stepX, y: 0}; break;
+                    case '!': // Shift+1
+                        if(e.shiftKey) document.getElementById('debug-panel').style.display = 
+                            document.getElementById('debug-panel').style.display === 'none' ? 'block' : 'none';
+                        break;
+                }
+            }
+
+            spawnFood() {
+                // Random vị trí 0.1 đến 0.9
+                this.food = {
+                    x: 0.1 + Math.random() * 0.8,
+                    y: 0.1 + Math.random() * 0.8
+                };
+            }
+
+            gameLoop(time) {
+                // 1. Logic Worker: Tính hiệu ứng pulse cho thức ăn
+                this.logicWorker.postMessage({ type: 'CALC_PULSE', payload: { time } });
+
+                // 2. Game Logic (Main Thread)
+                if (time - this.lastMoveTime > this.moveInterval) {
+                    this.lastMoveTime = time;
+                    this.direction = this.nextDirection;
+
+                    // Di chuyển đầu rắn
+                    const head = this.snake[0];
+                    const newHead = { x: head.x + this.direction.x, y: head.y + this.direction.y };
+
+                    // Wrap around (Đi xuyên tường)
+                    if(newHead.x < 0) newHead.x = 1;
+                    if(newHead.x > 1) newHead.x = 0;
+                    if(newHead.y < 0) newHead.y = 1;
+                    if(newHead.y > 1) newHead.y = 0;
+
+                    // Check va chạm bản thân
+                    // (Bỏ qua vài đốt đầu để tránh va chạm ngay khi quay đầu)
+                    for(let i = 4; i < this.snake.length; i++) {
+                        const dist = Math.hypot(newHead.x - this.snake[i].x, newHead.y - this.snake[i].y);
+                        if(dist < 0.01) {
+                            // Game Over - Reset
+                            this.snake = [{x: 0.5, y: 0.5}];
+                            this.score = 0;
+                            document.getElementById('score-board').innerText = "SCORE: 0";
+                            this.moveInterval = 100;
+                            return; 
+                        }
+                    }
+
+                    // Check ăn mồi
+                    const distFood = Math.hypot(newHead.x - this.food.x, newHead.y - this.food.y);
+                    let ate = false;
+                    if (distFood < 0.03) { // Bán kính va chạm
+                        this.score++;
+                        document.getElementById('score-board').innerText = "SCORE: " + this.score;
+                        this.spawnFood();
+                        ate = true;
+                        // Tăng tốc độ
+                        if(this.moveInterval > 30) this.moveInterval -= 2;
+                    }
+
+                    // Cập nhật mảng rắn
+                    this.snake.unshift(newHead);
+                    if (!ate) {
+                        this.snake.pop();
+                    }
+                    
+                    // Giới hạn độ dài để shader không bị crash (max 100)
+                    if(this.snake.length > 100) this.snake.pop();
+                }
+
+                // 3. Gửi dữ liệu xuống Render Worker
+                this.renderWorker.postMessage({
+                    type: 'UPDATE_GAME',
+                    payload: {
+                        snake: this.snake,
+                        length: this.snake.length,
+                        food: this.food,
+                        pulse: this.foodPulse
+                    }
+                });
+
+                requestAnimationFrame((t) => this.gameLoop(t));
+            }
+
+            handleRenderMessage(e) {
+                if (e.data.type === 'STATS') {
+                    document.getElementById('stat-fps').innerText = e.data.fps;
+                    document.getElementById('stat-res').innerText = `${this.canvas.width}x${this.canvas.height}`;
+                    document.getElementById('stat-len').innerText = this.snake.length;
+                }
+            }
+        }
+
+        window.onload = () => new Engine();
+    </script>
+</body>
+</html>
